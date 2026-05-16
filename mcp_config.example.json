@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "filesystem-cep": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "C:/path/to/traffic-alert-cep"
+      ]
+    },
+    "playwright-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
+    }
+  }
+}

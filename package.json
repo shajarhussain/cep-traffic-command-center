@@ -1,0 +1,30 @@
+{
+  "name": "cep-traffic-alert-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Event-Driven Traffic Alert System — CEP Project",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run db:generate && npm run db:migrate && npm run db:seed",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/api && npm run build --workspace=apps/web",
+    "test": "npm run test --workspace=apps/api",
+    "test:watch": "npm run test:watch --workspace=apps/api",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema=prisma/schema.prisma",
+    "db:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
+    "db:reset": "prisma migrate reset --schema=prisma/schema.prisma --force",
+    "db:seed": "tsx prisma/seed.ts",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "puppeteer": "^24.43.1",
+    "typescript": "^5.7.0"
+  }
+}

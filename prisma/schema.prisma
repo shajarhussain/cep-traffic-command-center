@@ -1,0 +1,293 @@
+// Prisma schema for Event-Driven Traffic Alert System V2
+// Incident-Aware Traffic Operations Command Center
+//
+// Original CEP models (1–8) preserved.
+// V2 adds user-driven configuration layer (9–20).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── 1. TrafficCamera ──────────────────────────────────────────
+model TrafficCamera {
+  id               String   @id @default(uuid())
+  cameraCode       String   @unique
+  name             String   @default("")
+  intersectionName String
+  intersectionId   String?
+  latitude         Float?
+  longitude        Float?
+  speedLimitKmh    Int
+  status           String   @default("ACTIVE")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  intersection     Intersection? @relation(fields: [intersectionId], references: [id])
+}
+
+// ─── 2. EventEnvelopeRecord ────────────────────────────────────
+model EventEnvelopeRecord {
+  eventId       String   @id
+  correlationId String
+  schemaVersion Int
+  sourceId      String
+  timestamp     DateTime
+  eventType     String
+  payloadJson   String
+  priority      String   @default("NORMAL")
+  createdAt     DateTime @default(now())
+}
+
+// ─── 3. ProcessedEvent ─────────────────────────────────────────
+model ProcessedEvent {
+  id             String   @id @default(uuid())
+  eventId        String
+  subscriberName String
+  processedAt    DateTime @default(now())
+
+  @@unique([eventId, subscriberName])
+}
+
+// ─── 4. Penalty ────────────────────────────────────────────────
+model Penalty {
+  id            String   @id @default(uuid())
+  eventId       String   @unique
+  cameraId      String
+  vehiclePlate  String
+  speedKmh      Int
+  speedLimitKmh Int
+  fineAmount    Int
+  status        String   @default("ISSUED")
+  issuedAt      DateTime @default(now())
+}
+
+// ─── 5. AuditLog ───────────────────────────────────────────────
+model AuditLog {
+  id              String   @id @default(uuid())
+  eventId         String
+  eventType       String
+  message         String
+  payloadSnapshot String
+  createdAt       DateTime @default(now())
+}
+
+// ─── 6. DashboardSnapshot ──────────────────────────────────────
+model DashboardSnapshot {
+  id                 String   @id @default(uuid())
+  intersectionName   String
+  congestionLevel    String
+  activeVehicleCount Int      @default(0)
+  lastEventId        String
+  updatedAt          DateTime @updatedAt
+}
+
+// ─── 7. ReportAggregate ────────────────────────────────────────
+model ReportAggregate {
+  id          String   @id @default(uuid())
+  eventType   String
+  cameraId    String?
+  count       Int      @default(0)
+  windowStart DateTime
+  windowEnd   DateTime
+
+  @@unique([eventType, cameraId, windowStart])
+}
+
+// ─── 8. EventOutbox ────────────────────────────────────────────
+model EventOutbox {
+  id           String    @id @default(uuid())
+  eventId      String    @unique
+  envelopeJson String
+  status       String    @default("PENDING")
+  attemptCount Int       @default(0)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  publishedAt  DateTime?
+}
+
+// ─── 9. TrafficIncident ────────────────────────────────────────
+model TrafficIncident {
+  id                       String    @id @default(uuid())
+  intersection_name        String
+  incident_type            String
+  severity                 String
+  status                   String    @default("OPEN")
+  first_event_id           String
+  last_event_id            String
+  event_count              Int       @default(1)
+  external_confirmed       Boolean   @default(false)
+  external_context_summary String?
+  opened_at                DateTime  @default(now())
+  updated_at               DateTime  @updatedAt
+  acknowledged_at          DateTime?
+  cleared_at               DateTime?
+
+  events                   IncidentEvent[]
+}
+
+// ─── 10. OperationZone ─────────────────────────────────────────
+model OperationZone {
+  id                        String   @id @default(uuid())
+  name                      String
+  city                      String
+  country                   String
+  centerLatitude            Float
+  centerLongitude           Float
+  bboxMinLatitude           Float?
+  bboxMinLongitude          Float?
+  bboxMaxLatitude           Float?
+  bboxMaxLongitude          Float?
+  externalProviderEnabled   Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  intersections             Intersection[]
+  externalProviders         ExternalProviderConfig[]
+}
+
+// ─── 11. Intersection ──────────────────────────────────────────
+model Intersection {
+  id                  String   @id @default(uuid())
+  zoneId              String
+  name                String
+  roadName            String?
+  latitude            Float
+  longitude           Float
+  defaultSpeedLimit   Int      @default(60)
+  congestionThreshold Int      @default(20)
+  status              String   @default("ACTIVE")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  zone                OperationZone   @relation(fields: [zoneId], references: [id])
+  cameras             TrafficCamera[]
+}
+
+// ─── 12. AlertTemplate ─────────────────────────────────────────
+model AlertTemplate {
+  id              String   @id @default(uuid())
+  name            String
+  eventType       String
+  description     String   @default("")
+  defaultPayload  String   @default("{}")
+  severityHint    String?
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── 13. SeverityPolicy ────────────────────────────────────────
+model SeverityPolicy {
+  id                  String   @id @default(uuid())
+  name                String
+  eventType           String
+  lowThreshold        Float?
+  mediumThreshold     Float?
+  highThreshold       Float?
+  criticalThreshold   Float?
+  payloadField        String   @default("speed_kmh")
+  active              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+// ─── 14. IncidentRule ──────────────────────────────────────────
+model IncidentRule {
+  id                    String   @id @default(uuid())
+  name                  String
+  incidentType          String
+  eventType             String
+  groupingWindowMinutes Int      @default(30)
+  minimumEvents         Int      @default(1)
+  escalationThreshold   Int      @default(5)
+  autoClearEventType    String?
+  active                Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ─── 15. QueuePolicy ───────────────────────────────────────────
+model QueuePolicy {
+  id              String   @id @default(uuid())
+  name            String
+  incomingRate    Int      @default(500)
+  processingRate  Int      @default(80)
+  queueLimit      Int      @default(10000)
+  evictionPolicy  String   @default("Drop least important first; if same priority, drop oldest")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ─── 16. ExternalProviderConfig ────────────────────────────────
+model ExternalProviderConfig {
+  id              String    @id @default(uuid())
+  provider        String    @default("TOMTOM")
+  enabled         Boolean   @default(false)
+  zoneId          String
+  lastStatus      String    @default("UNKNOWN")
+  lastCheckedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  zone            OperationZone @relation(fields: [zoneId], references: [id])
+}
+
+// ─── 17. IncidentEvent ─────────────────────────────────────────
+model IncidentEvent {
+  id          String   @id @default(uuid())
+  incidentId  String
+  eventId     String
+  eventType   String
+  severity    String
+  createdAt   DateTime @default(now())
+
+  incident    TrafficIncident @relation(fields: [incidentId], references: [id])
+}
+
+// ─── 18. ExternalTrafficSnapshot ───────────────────────────────
+model ExternalTrafficSnapshot {
+  id           String   @id @default(uuid())
+  provider     String
+  areaName     String
+  latitude     Float?
+  longitude    Float?
+  snapshotType String
+  riskLevel    String
+  rawPayload   String
+  summary      String
+  fetchedAt    DateTime @default(now())
+  fallback     Boolean  @default(false)
+}
+
+// ─── 19. OperatorActionLog ─────────────────────────────────────
+model OperatorActionLog {
+  id          String   @id @default(uuid())
+  actionType  String
+  targetType  String
+  targetId    String
+  message     String
+  createdAt   DateTime @default(now())
+}
+
+// ─── 20. FinePolicy ────────────────────────────────────────────
+// User-driven fine schedule. Replaces the previously hardcoded
+// `excessKmh > 30 ? 5000 : > 15 ? 3000 : 1500` in AlertService.
+// Highest-threshold matching row wins.
+model FinePolicy {
+  id                 String   @id @default(uuid())
+  name               String
+  eventType          String   // e.g. "SpeedViolationEvent"
+  excessThresholdKmh Int      // policy applies when excess >= this value
+  fineAmount         Int
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([eventType, active, excessThresholdKmh])
+}
