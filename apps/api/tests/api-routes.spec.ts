@@ -8,6 +8,7 @@ import type { Express } from "express";
 
 let prisma: PrismaClient;
 let app: Express;
+let ctx: any;
 
 async function seedCameras() {
   for (const cam of [
@@ -27,8 +28,13 @@ beforeEach(async () => {
   await cleanTestDb(prisma);
   await seedCameras();
   // Recreate SystemContext each test so in-memory subscriber state is fresh
-  const ctx = createSystemContext(prisma);
+  ctx = createSystemContext(prisma);
   app = createApp(ctx);
+  ctx.startBackgroundWorkers();
+});
+
+afterEach(() => {
+  ctx.stopBackgroundWorkers();
 });
 
 afterAll(async () => {
@@ -148,6 +154,10 @@ describe("API Routes (Phase 5)", () => {
       source_id: "CAM-ISB-003", event_type: "CongestionAlertEvent",
       payload: { intersection: "F-8 Markaz", vehicle_count: 50, congestion_level: "CRITICAL", detected_at: new Date().toISOString() },
     });
+    
+    // Wait for the async BoundedEventQueue to be drained by DashboardService
+    await new Promise(r => setTimeout(r, 150));
+    
     const res = await request(app).get("/api/dashboard");
     expect(res.status).toBe(200);
     expect(res.body.length).toBeGreaterThanOrEqual(1);

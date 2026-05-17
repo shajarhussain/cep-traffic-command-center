@@ -1,0 +1,59 @@
+classDiagram
+    direction LR
+
+    class IEventSubscriber {
+        <<interface>>
+        +name: string
+        +supportedEventTypes: string[]
+        +handle(envelope: EventEnvelope) Promise~void~
+    }
+
+    class BaseIdempotentSubscriber {
+        <<abstract>>
+        -processedRepo: ProcessedEventRepository
+        -duplicateIgnoredCount: number
+        -processedCount: number
+        +handle(envelope) Promise~void~
+        #process(envelope)* Promise~void~
+    }
+
+    class EventBus {
+        -subscribers: Map~string, Set~IEventSubscriber~~
+        +subscribe(eventType, subscriber) void
+        +unsubscribe(eventType, subscriber) void
+        +publish(envelope) Promise~void~
+        +getSubscriberCount(eventType) number
+        +getRegisteredEventTypes() string[]
+        +isSubscribed(eventType, subscriber) boolean
+    }
+
+    class AlertService {
+        +name = "AlertService"
+        +supportedEventTypes = ["SpeedViolationEvent"]
+        #process(envelope) Promise~void~
+    }
+
+    class LoggingService {
+        +name = "LoggingService"
+        +supportedEventTypes = ["SpeedViolationEvent","CongestionAlertEvent"]
+        #process(envelope) Promise~void~
+    }
+
+    class DashboardService {
+        +name = "DashboardService"
+        +supportedEventTypes = ["VehicleDetectedEvent","CongestionAlertEvent","TrafficClearedEvent"]
+        #process(envelope) Promise~void~
+    }
+
+    class ReportingService {
+        +name = "ReportingService"
+        +supportedEventTypes = ["VehicleDetectedEvent","SpeedViolationEvent"]
+        #process(envelope) Promise~void~
+    }
+
+    IEventSubscriber <|.. BaseIdempotentSubscriber : implements
+    BaseIdempotentSubscriber <|-- AlertService : extends
+    BaseIdempotentSubscriber <|-- LoggingService : extends
+    BaseIdempotentSubscriber <|-- DashboardService : extends
+    BaseIdempotentSubscriber <|-- ReportingService : extends
+    EventBus o-- IEventSubscriber : holds Set of (NOT concrete classes)

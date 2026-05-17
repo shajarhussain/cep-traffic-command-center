@@ -1,0 +1,63 @@
+flowchart LR
+    subgraph Field["Field Layer"]
+        Cam1[Camera 1<br/>Intersection A]
+        Cam2[Camera 2<br/>Intersection B]
+        CamN[Camera N<br/>...]
+    end
+
+    subgraph API["API Layer — Node/Express"]
+        REST["REST Endpoints<br/>POST /api/events/publish<br/>POST /api/events/publish-duplicate-speed-violation<br/>GET /api/queue/analysis<br/>GET /api/subscribers"]
+        UC[PublishEventUseCase]
+        Bus(((EventBus<br/>Map String → Set IEventSubscriber)))
+        BQ[BoundedEventQueue<br/>maxSize=10 000<br/>priority eviction]
+        Relay[OutboxRelay<br/>background poller]
+    end
+
+    subgraph Subs["Subscriber Layer (Observers)"]
+        Alert[AlertService<br/>→ penalty notices]
+        Log[LoggingService<br/>→ audit log]
+        Dash[DashboardService<br/>→ live state]
+        Rep[ReportingService<br/>→ aggregates]
+    end
+
+    subgraph DB["Persistence — Prisma + SQLite/Postgres"]
+        EventDB[(EventEnvelopeRecord)]
+        OutboxDB[(EventOutbox<br/>PENDING / PUBLISHED / FAILED)]
+        ProcDB[(ProcessedEvent<br/>UNIQUE event_id + subscriber_name)]
+        PenDB[(Penalty<br/>UNIQUE event_id)]
+        AuditDB[(AuditLog)]
+        DashDB[(IntersectionState)]
+        RepDB[(ReportAggregates)]
+    end
+
+    subgraph UI["Web Dashboard — React"]
+        CC[Command Center]
+        Sim[Alert Simulator]
+        Insp[Event Inspector]
+        IdemUI[Idempotency Demo]
+        QueueUI[Capacity Monitor]
+        OutboxUI[Outbox Admin]
+    end
+
+    Cam1 --> REST
+    Cam2 --> REST
+    CamN --> REST
+    REST --> UC
+    UC -->|atomic txn| EventDB
+    UC -->|atomic txn| OutboxDB
+    UC -->|eager dispatch| Bus
+    Relay -->|polls PENDING| OutboxDB
+    Relay -->|retry publish| Bus
+    Bus --> Alert
+    Bus --> Log
+    Bus -->|via queue| BQ --> Dash
+    Bus --> Rep
+    Alert --> ProcDB
+    Alert --> PenDB
+    Log --> ProcDB
+    Log --> AuditDB
+    Dash --> ProcDB
+    Dash --> DashDB
+    Rep --> ProcDB
+    Rep --> RepDB
+    UI -.->|HTTP| REST

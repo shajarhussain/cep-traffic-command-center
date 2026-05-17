@@ -1,0 +1,56 @@
+classDiagram
+    direction TB
+
+    class EventEnvelope~P~ {
+        <<generic data carrier>>
+        +event_id: string (UUID v4)
+        +correlation_id: string (UUID v4)
+        +schema_version: number (default 1)
+        +source_id: string (camera id)
+        +timestamp: string (ISO 8601 UTC)
+        +event_type: string
+        +payload: P
+    }
+
+    class VehicleDetectedPayload {
+        +vehicle_plate: string
+        +intersection_name: string
+        +lane_number?: number
+    }
+
+    class SpeedViolationPayload {
+        +vehicle_plate: string
+        +speed_kmh: number
+        +speed_limit_kmh: number
+        +intersection_name: string
+    }
+
+    class CongestionAlertPayload {
+        +intersection_name: string
+        +vehicle_count: number
+        +congestion_level: "HIGH" | "CRITICAL"
+    }
+
+    class TrafficClearedPayload {
+        +intersection_name: string
+        +cleared_at: string
+    }
+
+    class EmergencyVehiclePayload {
+        <<5th type — extensibility proof>>
+        +vehicle_plate: string
+        +intersection_name: string
+        +route_priority: "AMBULANCE" | "FIRE" | "POLICE"
+    }
+
+    class createEnvelope {
+        <<factory function>>
+        +createEnvelope(opts) EventEnvelope~P~
+    }
+
+    EventEnvelope~P~ <.. VehicleDetectedPayload : payload type
+    EventEnvelope~P~ <.. SpeedViolationPayload : payload type
+    EventEnvelope~P~ <.. CongestionAlertPayload : payload type
+    EventEnvelope~P~ <.. TrafficClearedPayload : payload type
+    EventEnvelope~P~ <.. EmergencyVehiclePayload : payload type
+    createEnvelope ..> EventEnvelope~P~ : creates

@@ -21,6 +21,7 @@ import { TomTomPoller } from "./TomTomPoller.js";
 import { PrismaFinePolicyRepository } from "../infrastructure/repositories/FinePolicyRepository.js";
 import { PrismaOperatorActionRepository } from "../infrastructure/repositories/OperatorActionRepository.js";
 import defaultPrisma from "../infrastructure/prisma.js";
+import { BoundedEventQueue } from "../domain/bus/BoundedEventQueue.js";
 
 export interface SystemContext {
   prisma: PrismaClient;
@@ -60,9 +61,10 @@ export function createSystemContext(customPrisma?: PrismaClient): SystemContext 
   const finePolicyRepo = new PrismaFinePolicyRepository(prisma);
   const operatorActionRepo = new PrismaOperatorActionRepository(prisma);
   const eventBus = new EventBus();
+  const boundedQueue = new BoundedEventQueue(10000);
   const alertService = new AlertService(processedRepo, penaltyRepo, finePolicyRepo);
   const loggingService = new LoggingService(processedRepo, auditLogRepo);
-  const dashboardService = new DashboardService(processedRepo, dashboardRepo);
+  const dashboardService = new DashboardService(processedRepo, dashboardRepo, boundedQueue);
   const reportingService = new ReportingService(processedRepo, reportRepo);
   const incidentService = new IncidentService(processedRepo, prisma);
   bootstrapSubscribers(eventBus, [alertService, loggingService, dashboardService, reportingService, incidentService]);
@@ -83,7 +85,7 @@ export function createSystemContext(customPrisma?: PrismaClient): SystemContext 
     reportRepo, outboxRepo, processedRepo, finePolicyRepo, operatorActionRepo,
     alertService, loggingService, dashboardService, reportingService, incidentService,
     cameraSimulator, publishUseCase, duplicateUseCase, outboxRelay, tomTomPoller,
-    startBackgroundWorkers: () => { outboxRelay.start(); tomTomPoller.start(); },
-    stopBackgroundWorkers:  () => { outboxRelay.stop();  tomTomPoller.stop();  },
+    startBackgroundWorkers: () => { outboxRelay.start(); tomTomPoller.start(); dashboardService.start(); },
+    stopBackgroundWorkers:  () => { outboxRelay.stop();  tomTomPoller.stop();  dashboardService.stop(); },
   };
 }
