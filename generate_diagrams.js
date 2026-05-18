@@ -24,11 +24,15 @@ for (const file of files) {
     
     // Run mermaid-cli
     try {
-      console.log(`Rendering ${pngPath}...`);
-      // Use the local node_modules puppeteer by passing the puppeteer config if needed, 
-      // but mmdc usually handles it. We use npx.
-      execSync(`npx -y @mermaid-js/mermaid-cli -i "${mmdPath}" -o "${pngPath}" -b transparent`, { stdio: 'inherit' });
-      console.log(`✓ Created ${pngPath}`);
+      const svgPath = path.join(umlDir, `${basename}.svg`);
+      console.log(`Rendering ${pngPath} and ${svgPath}...`);
+      
+      // Generate PNG
+      execSync(`npx -y @mermaid-js/mermaid-cli -i "${mmdPath}" -o "${pngPath}" -b transparent -s 2`, { stdio: 'inherit' });
+      // Generate SVG
+      execSync(`npx -y @mermaid-js/mermaid-cli -i "${mmdPath}" -o "${svgPath}" -b transparent`, { stdio: 'inherit' });
+      
+      console.log(`✓ Created diagrams for ${basename}`);
     } catch (e) {
       console.error(`✗ Failed to render ${file}:`, e.message);
     }

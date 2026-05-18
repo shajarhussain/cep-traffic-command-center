@@ -1,28 +1,30 @@
 sequenceDiagram
     autonumber
-    participant Camera
-    participant Bus as EventBus
-    participant Alert as AlertService (extends BaseIdempotentSubscriber)
-    participant Repo as ProcessedEventRepository
-    participant DB as Penalty Table
+    actor Camera
+    participant EventBus
+    participant AlertService
+    participant ProcessedEventRepository
+    participant Database
 
-    Note over Camera,DB: ── First attempt — event_id = "evt-123" ──
-    Camera->>Bus: publish(envelope, event_id="evt-123")
-    Bus->>Alert: handle(envelope)
-    Alert->>Repo: exists("evt-123", "AlertService")?
-    Repo-->>Alert: false (never seen)
-    Alert->>DB: INSERT Penalty(event_id="evt-123")
-    DB-->>Alert: OK
-    Alert->>Repo: markProcessed("evt-123", "AlertService")
-    Repo-->>Alert: OK
-    Alert-->>Bus: done (processedCount = 1)
+    Camera->>EventBus: publish(SpeedViolationEvent, event_id: 123)
+    EventBus->>AlertService: handle(envelope)
+    
+    rect rgb(240, 248, 255)
+        note right of AlertService: First Attempt
+        AlertService->>ProcessedEventRepository: exists("123", "AlertService")
+        ProcessedEventRepository-->>AlertService: false (not found)
+        AlertService->>Database: INSERT Penalty
+        AlertService->>ProcessedEventRepository: markProcessed("123", "AlertService")
+    end
 
-    Note over Camera,DB: ── Duplicate attempt — same event_id "evt-123" ──
-    Camera->>Bus: publish(envelope, event_id="evt-123")
-    Bus->>Alert: handle(envelope)
-    Alert->>Repo: exists("evt-123", "AlertService")?
-    Repo-->>Alert: true (already processed)
-    Note right of Alert: SILENTLY SKIP — no DB write
-    Alert-->>Bus: done (duplicateIgnoredCount = 1)
-
-    Note over DB: Final state: ONLY ONE Penalty row exists
+    Camera->>EventBus: publish(SpeedViolationEvent, event_id: 123)
+    note right of Camera: Network retry sends EXACT same event
+    EventBus->>AlertService: handle(envelope)
+    
+    rect rgb(255, 240, 245)
+        note right of AlertService: Duplicate Attempt
+        AlertService->>ProcessedEventRepository: exists("123", "AlertService")
+        ProcessedEventRepository-->>AlertService: true (found)
+        AlertService-->>EventBus: return (skip silently)
+        note right of AlertService: Result: Only ONE penalty row exists.
+    end

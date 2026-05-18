@@ -1,5 +1,5 @@
 classDiagram
-    direction LR
+    direction TB
 
     class IEventSubscriber {
         <<interface>>
@@ -10,45 +10,41 @@ classDiagram
 
     class BaseIdempotentSubscriber {
         <<abstract>>
-        -processedRepo: ProcessedEventRepository
-        -duplicateIgnoredCount: number
-        -processedCount: number
-        +handle(envelope) Promise~void~
-        #process(envelope)* Promise~void~
+        - _duplicateIgnoredCount: number
+        - _processedCount: number
+        +handle(envelope: EventEnvelope) Promise~void~
+        #process(envelope: EventEnvelope)* Promise~void~
     }
 
     class EventBus {
         -subscribers: Map~string, Set~IEventSubscriber~~
-        +subscribe(eventType, subscriber) void
-        +unsubscribe(eventType, subscriber) void
-        +publish(envelope) Promise~void~
-        +getSubscriberCount(eventType) number
-        +getRegisteredEventTypes() string[]
-        +isSubscribed(eventType, subscriber) boolean
+        +subscribe(eventType: string, subscriber: IEventSubscriber) void
+        +unsubscribe(eventType: string, subscriber: IEventSubscriber) void
+        +publish(envelope: EventEnvelope) Promise~void~
     }
 
     class AlertService {
-        +name = "AlertService"
-        +supportedEventTypes = ["SpeedViolationEvent"]
-        #process(envelope) Promise~void~
+        +name: string
+        +supportedEventTypes: string[]
+        #process(envelope: EventEnvelope) Promise~void~
     }
 
     class LoggingService {
-        +name = "LoggingService"
-        +supportedEventTypes = ["SpeedViolationEvent","CongestionAlertEvent"]
-        #process(envelope) Promise~void~
+        +name: string
+        +supportedEventTypes: string[]
+        #process(envelope: EventEnvelope) Promise~void~
     }
 
     class DashboardService {
-        +name = "DashboardService"
-        +supportedEventTypes = ["VehicleDetectedEvent","CongestionAlertEvent","TrafficClearedEvent"]
-        #process(envelope) Promise~void~
+        +name: string
+        +supportedEventTypes: string[]
+        #process(envelope: EventEnvelope) Promise~void~
     }
 
     class ReportingService {
-        +name = "ReportingService"
-        +supportedEventTypes = ["VehicleDetectedEvent","SpeedViolationEvent"]
-        #process(envelope) Promise~void~
+        +name: string
+        +supportedEventTypes: string[]
+        #process(envelope: EventEnvelope) Promise~void~
     }
 
     IEventSubscriber <|.. BaseIdempotentSubscriber : implements
@@ -56,4 +52,4 @@ classDiagram
     BaseIdempotentSubscriber <|-- LoggingService : extends
     BaseIdempotentSubscriber <|-- DashboardService : extends
     BaseIdempotentSubscriber <|-- ReportingService : extends
-    EventBus o-- IEventSubscriber : holds Set of (NOT concrete classes)
+    EventBus o-- IEventSubscriber : holds subscribers as interface references

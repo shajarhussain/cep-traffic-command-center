@@ -1,15 +1,14 @@
 classDiagram
     direction TB
 
-    class EventEnvelope~P~ {
-        <<generic data carrier>>
-        +event_id: string (UUID v4)
-        +correlation_id: string (UUID v4)
-        +schema_version: number (default 1)
-        +source_id: string (camera id)
-        +timestamp: string (ISO 8601 UTC)
+    class EventEnvelope~TPayload~ {
+        +event_id: string
+        +correlation_id: string
+        +schema_version: number
+        +source_id: string
+        +timestamp: string
         +event_type: string
-        +payload: P
+        +payload: TPayload
     }
 
     class VehicleDetectedPayload {
@@ -28,7 +27,7 @@ classDiagram
     class CongestionAlertPayload {
         +intersection_name: string
         +vehicle_count: number
-        +congestion_level: "HIGH" | "CRITICAL"
+        +congestion_level: string
     }
 
     class TrafficClearedPayload {
@@ -36,21 +35,13 @@ classDiagram
         +cleared_at: string
     }
 
-    class EmergencyVehiclePayload {
-        <<5th type — extensibility proof>>
-        +vehicle_plate: string
-        +intersection_name: string
-        +route_priority: "AMBULANCE" | "FIRE" | "POLICE"
+    class Factory {
+        <<factory>>
+        +createEnvelope(params) EventEnvelope
     }
 
-    class createEnvelope {
-        <<factory function>>
-        +createEnvelope(opts) EventEnvelope~P~
-    }
-
-    EventEnvelope~P~ <.. VehicleDetectedPayload : payload type
-    EventEnvelope~P~ <.. SpeedViolationPayload : payload type
-    EventEnvelope~P~ <.. CongestionAlertPayload : payload type
-    EventEnvelope~P~ <.. TrafficClearedPayload : payload type
-    EventEnvelope~P~ <.. EmergencyVehiclePayload : payload type
-    createEnvelope ..> EventEnvelope~P~ : creates
+    EventEnvelope *-- VehicleDetectedPayload : contains
+    EventEnvelope *-- SpeedViolationPayload : contains
+    EventEnvelope *-- CongestionAlertPayload : contains
+    EventEnvelope *-- TrafficClearedPayload : contains
+    Factory ..> EventEnvelope : creates
